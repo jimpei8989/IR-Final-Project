@@ -14,7 +14,7 @@ mkdir data/train
 wget https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-doctrain-queries.tsv.gz -P data/train/ 2> /dev/null &
 wget https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-doctrain-top100.gz -P data/train/ 2> /dev/null &
 wget https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-doctrain-qrels.tsv.gz -P data/train/ 2> /dev/null &
-wget https://github.com/microsoft/TREC-2019-Deep-Learning/blob/master/utils/msmarco-doctriples.py -P data/train/ 2> /dev/null &
+wget https://raw.githubusercontent.com/microsoft/TREC-2019-Deep-Learning/master/utils/msmarco-doctriples.py -P data/train/ 2> /dev/null &
 
 # Development
 mkdir data/dev

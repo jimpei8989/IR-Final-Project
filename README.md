@@ -12,3 +12,14 @@
 
 - [Hackmd - Memo](https://hackmd.io/@jimpei8989/SyzKDbva8)
 
+### Data Splitting
+- Corpus: Randomly Select 1M documents
+    - `data/partial/corpus/docIDs`, each line is a document we chose. *shasum: a6b8f150e0fa424614ecc1f636dbbe74cd62a1db*
+- Train
+    - Queries: 50K queries
+    - `data/partial/train/queries.tsv`, each line is "queryID<TAB>query string". *shasum: 6365ca4dee17a0c7d7719af42be367c1294ac763*
+    - `data/partial/train/topK.csv`, each line is "queryID,relevantDocuments"; the relevant documents are seperated with spaces
+- Development
+    - Similar to `data/partial/train/topK.csv`
+- Test
+    - Similar to `data/partial/train/topK.csv`
