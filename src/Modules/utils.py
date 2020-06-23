@@ -1,5 +1,5 @@
 import os, sys, time
-import pickle
+import json, pickle
 
 import numpy as np
 
@@ -31,6 +31,14 @@ class EventTimer():
     def gettime(self):
         return time.time() - self.beginTimestamp
 
+def jsonSave(obj, file):
+    with open(file, 'w') as f:
+        json.dump(obj, f)
+
+def jsonLoad(file):
+    with open(file) as f:
+        return json.load(f)
+
 def pickleSave(obj, file):
     with open(file, 'wb') as f:
         pickle.dump(obj, f)
@@ -39,3 +47,13 @@ def pickleLoad(file):
     with open(file, 'rb') as f:
         return pickle.load(f)
     
+def MAP(truth, prediction):
+    def AP(t, p):
+        precisions = []
+        cnt = 0
+        for i, d in enumerate(p):
+            if d in t:
+                cnt += 1
+                precisions.append(cnt / (i + 1))
+        return sum(precisions) / len(t)
+    return np.mean([AP(t, p) for t, p in zip(truth, prediction)])
