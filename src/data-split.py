@@ -1,6 +1,7 @@
 import os, shutil
 import numpy as np
 from tqdm import tqdm
+import pickle
 
 from argparse import ArgumentParser
 from Modules.utils import EventTimer
@@ -97,13 +98,34 @@ def main():
 
         with open(os.path.join(args.outputDir, 'test', 'topK.csv'), 'w') as f:
             for queryID, docIDs in relevantDocuments.items():
-                print(f'{queryID},{" ".join(docIDs)}', file = f)
+                print(f'{queryID},{" ".join(docIDs)}', file=f)
+                
+    if args.generateCorpus:
+        with EventTimer('Generating Corpus'):
+            offsetLookup = {}
+            with open(os.path.join('data', 'corpus', 'msmarco-docs-lookup.tsv')) as f:
+                for QID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines()):
+                    offsetLookup[QID] = int(tsvOffset)
 
+            with open(os.path.join('data', 'corpus', 'msmarco-docs.tsv')) as f:
+                def getDocument(docID):
+                    f.seek(offsetLookup[docID])
+                    docID, url, title, content = f.readline().split('\t')
+                    return title + content
+                corpus = list(map(getDocument, tqdm(partialCorpusIDs)))
+        
+        with open('data/partial/corpus/partial_corpus.pkl', 'wb') as f:
+            pickle.dump(corpus, f)
+        with open('data/partial/corpus/docIDs.pkl', 'wb') as f:
+            pickle.dump(partialCorpusIDs, f)
+
+        
 def parseArguments():
     parser = ArgumentParser()
     parser.add_argument('--outputDir', default='data/partial')
     parser.add_argument('--corpusSize', type=int, default=1000000)
     parser.add_argument('--querySize', type=int, default=50000)
+    parser.add_argument('--generateCorpus', action='store_true')
     return parser.parse_args()
 
 if __name__ == '__main__':
