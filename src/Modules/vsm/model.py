@@ -8,6 +8,8 @@ import nltk
 from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+from Modules import utils
 from Modules.utils import EventTimer
 
 class Model():
@@ -18,23 +20,27 @@ class Model():
         self.numWorkers = numWorkers
 
     def build(self, corpusDir, docIDFile):
-        with open(docIDFile) as f:
-            self.documentIDs = map(lambda line: line.strip(), f.readlines())
+        with EventTimer('[VSM - fit] Load Corpus'):
+            # Get document IDs
+            with open(docIDFile) as f:
+                self.documentIDs = [line.strip() for line in  f.readlines()]
 
-        offsetLookup = {}
-        with open(os.path.join(corpusDir, 'msmarco-docs-lookup.tsv')) as f:
-            for QID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines()):
-                offsetLookup[QID] = int(tsvOffset)
+            # Get the offsets
+            offsetLookup = {}
+            with open(os.path.join(corpusDir, 'msmarco-docs-lookup.tsv')) as f:
+                for QID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines()):
+                    offsetLookup[QID] = int(tsvOffset)
 
-        with open(os.path.join(corpusDir, 'msmarco-docs.tsv')) as f:
-            def getDocument(docID):
-                f.seek(offsetLookup[docID])
-                docID, url, title, content = f.readline().split('\t')
-                return title + content
+            # Get the corresponding document
+            with open(os.path.join(corpusDir, 'msmarco-docs.tsv')) as f:
+                def getDocument(docID):
+                    f.seek(offsetLookup[docID])
+                    docID, url, title, content = f.readline().split('\t')
+                    return title + content
 
-            corpus = list(map(getDocument, tqdm(self.documentIDs)))
+                corpus = [getDocument(DID) for DID in self.documentIDs]
 
-        with EventTimer('Stemming'):
+        with EventTimer('[VSM - fit] Stemming'):
             stemmer = PorterStemmer()
             # corpus = Parallel(n_jobs=8, backend='threading', verbose=5)(delayed(stemmer.stem)(doc) for doc in corpus)
             with ThreadPool(self.numWorkers) as p:
@@ -49,20 +55,20 @@ class Model():
             min_df = self.minDF
         )
 
-        with EventTimer('Fitting tfidf'):
+        with EventTimer('[VSM - fit] Fitting tfidf'):
             tfidf = self.model.fit_transform(tqdm(corpus))
             print(f'> TF-IDF shape: {tfidf.shape}')
 
         return tfidf
 
     def transform(self, queries: typing.List[str]):
-        with EventTimer('Stemming (transform)'):
+        with EventTimer('[VSM - transform] Stemming (transform)'):
             stemmer = PorterStemmer()
 
             with ThreadPool(self.numWorkers) as p:
                 queries = p.map(stemmer.stem, tqdm(queries))
 
-        with EventTimer('Transform'):
+        with EventTimer('[VSM - transform] Transform tfidf'):
             queries = self.model.transform()
         
         return queries
