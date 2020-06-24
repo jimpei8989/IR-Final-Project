@@ -38,13 +38,13 @@ class Model():
                     docID, url, title, content = f.readline().split('\t')
                     return title + content
 
-                corpus = [getDocument(DID) for DID in self.documentIDs]
+                corpus = [getDocument(DID) for DID in tqdm(self.documentIDs)]
 
         with EventTimer('[VSM - fit] Stemming'):
             stemmer = PorterStemmer()
             # corpus = Parallel(n_jobs=8, backend='threading', verbose=5)(delayed(stemmer.stem)(doc) for doc in corpus)
             with ThreadPool(self.numWorkers) as p:
-                corpus = p.map(stemmer.stem, tqdm(corpus))
+                corpus = p.map(stemmer.stem, tqdm(corpus), chunksize=32)
 
         # Use nltk stemming and tokenizer
         # Ignore words appear in > 0.5 documents, and <0.05 documents
