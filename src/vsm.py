@@ -24,7 +24,8 @@ def main():
                 stop_words='english',
                 max_features =args.maxFeatures,
                 max_df=args.maxDF,
-                min_df=args.minDF
+                min_df=args.minDF,
+                sublinear_tf=args.sublinearTF
             )
 
             tfidf = model.fit_transform(tqdm(corpus))
@@ -42,17 +43,20 @@ def main():
         query, rel = q
         queryVec = model.transform([query]).toarray()
         scores = (tfidf @ queryVec.reshape(-1, 1)).reshape(-1)
-        retrievedDocuments = [corpus.idx2DocID(idx) for idx in np.argsort(-scores)[:args.topK]]
-        return utils.MAP(rel, retrievedDocuments)
+        topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
+        topKIdxes = sorted(topKIdxes, key=lambda i:scores[i], reverse=True)
+        return utils.MAP([rel], [map(corpus.idx2DocID, topKIdxes)])
 
-    for qdir in args.queryDir:
-        with EventTimer(f'Query on {qdir}'):
-            queries = QueryDataset(qdir)
+    with open(os.path.join(args.modelDir, 'result.txt'), 'w') as f:
+        for qdir in args.queryDir:
+            with EventTimer(f'Query on {qdir}'):
+                queries = QueryDataset(qdir)
 
-            with ThreadPool(args.numWorkers) as p:
-                APs = p.map(evaluate, tqdm(queries))
+                with ThreadPool(args.numWorkers) as p:
+                    APs = list(tqdm(p.imap(evaluate, queries), total=len(queries)))
 
-            print(f'> MAP: {np.mean(APs):.4f}')
+                print(f'> MAP: {np.mean(APs):.4f}')
+                print(f'{qdir} -> MAP: {np.mean(APs):.4f}', file=f)
 
 def parseeArguments():
     parser = ArgumentParser()
@@ -64,6 +68,7 @@ def parseeArguments():
     parser.add_argument('--maxFeatures', type=int, default=10**5, help='Maximum features used')
     parser.add_argument('--minDF', type=int, default=100, help='Minimum appearance can a word be adopted')
     parser.add_argument('--maxDF', type=float, default=0.5, help='Maximum frequency can a word be adopted')
+    parser.add_argument('--sublinearTF', type=bool, default=True)
     parser.add_argument('--topK', type=int, default=1000)
     parser.add_argument('--numWorkers', type=int, default=8)
     return parser.parse_args()
