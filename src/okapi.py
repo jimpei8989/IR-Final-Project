@@ -38,7 +38,11 @@ def main():
 
         # TODO: convert to the tfidf
         documentLengthes = scipy.sparse.csr_matrix(documentLengthes.reshape(-1, 1))
-        tf = (tf * (args.k1 + 1)) / (tf + args.k1 * (1 - args.b + args.b * documentLengthes / avgDL))
+        row, col = tf.nonzero()
+        data = tf[row, col]
+        data = data * (args.k1 + 1) / (data + args.k1 * (1 - args.b + args.b * documentLengthes[row] / avgDL)) * idf[col]
+        tfidf = scipy.sparse.csr_matrix((data, (row, col)), shape=tf.shape)
+        del row, col, data, tf
 
     print(f'> TFIDF shape: {tfidf.shape}')
     print(f'> IDF shape: {idf.shape}')
@@ -47,6 +51,7 @@ def main():
     def evaluate(q):
         query, rel = q
         queryVec = model.transform([query]).toarray()
+        queryVec *= (args.k3 + 1) / (args.k3 + queryVec)
         scores = (tfidf @ queryVec.reshape(-1, 1)).reshape(-1)
         topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
         topKIdxes = sorted(topKIdxes, key=lambda i:scores[i], reverse=True)
@@ -71,6 +76,7 @@ def parseeArguments():
     parser.add_argument('--modelDir', default='models/vsm/')
     parser.add_argument('--usedFeatures', nargs='+', default=['title', 'content'])
     parser.add_argument('--k1', type=float, default=1.2)
+    parser.add_argument('--k3', type=float, default=3)
     parser.add_argument('--b', type=float, default=0.75)
     parser.add_argument('--topK', type=int, default=1000)
     parser.add_argument('--numWorkers', type=int, default=8)
