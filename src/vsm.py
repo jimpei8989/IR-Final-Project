@@ -11,17 +11,35 @@ from Modules.utils import EventTimer
 from Modules import utils
 from Modules.vsm.dataset import Corpus, QueryDataset
 
+import nltk
+from nltk import PorterStemmer, word_tokenize
+
+def StemmingTokenizer(text):
+    stemmer = PorterStemmer()
+    return [stemmer.stem(word) for word in word_tokenize(text)]
+
 def main():
     args = parseeArguments()
+
+    # mkdir
+    os.makedirs(args.modelDir, exist_ok=True)
 
     # Get the corpus generator
     corpus = Corpus(os.path.join(args.dataDir, 'corpus/'), args.docIDFile, args.usedFeatures)
 
     if args.fit:
         with EventTimer('Fitting model'):
+            if args.stemming:
+                tokenizer = StemmingTokenizer
+                stop_words = set(StemmingTokenizer(' '.join(nltk.corpus.stopwords.words('english'))))
+                print(stop_words)
+            else:
+                tokenizer = None
+                stop_words = 'english'
             # Create Model
             model = TfidfVectorizer(
-                stop_words='english',
+                tokenizer=tokenizer,
+                stop_words=stop_words,
                 max_features =args.maxFeatures,
                 max_df=args.maxDF,
                 min_df=args.minDF,
@@ -66,6 +84,7 @@ def parseeArguments():
     parser.add_argument('--modelDir', default='models/vsm/')
     parser.add_argument('--fit', action='store_true')
     parser.add_argument('--usedFeatures', nargs='+', default=['title', 'content'])
+    parser.add_argument('--stemming', action='store_true')
     parser.add_argument('--maxFeatures', type=int, default=10**5, help='Maximum features used')
     parser.add_argument('--minDF', type=int, default=100, help='Minimum appearance can a word be adopted')
     parser.add_argument('--maxDF', type=float, default=0.5, help='Maximum frequency can a word be adopted')
