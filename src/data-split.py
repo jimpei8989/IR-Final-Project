@@ -83,7 +83,7 @@ def main():
             for queryID, docIDs in relevantDocuments.items():
                 print(f'{queryID},{" ".join(docIDs)}', file = f)
                 
-    with EventTimer('Handling Development Data'):
+    with EventTimer('Handling Testing Data'):
         relevantDocuments = dict()
         with open('data/test/msmarco-doctest2019-top100') as f:
             for line in tqdm(f.readlines()):
