@@ -48,12 +48,28 @@ def pickleLoad(file):
         return pickle.load(f)
     
 def MAP(truth, prediction):
+    """Calculate MAP score.
+
+    Parameters
+    ----------
+    truth : list of iterables
+        List of iterables containing relevant document ids.
+    
+    perdiction : list of iterables.
+        List of iterables containing relevant document ids.
+
+    Returns
+    -------
+    float
+        MAP score.
+    
+    """
     def AP(t, p):
-        precisions = []
+        precisions = 0.
         cnt = 0
         for i, d in enumerate(p):
             if d in t:
                 cnt += 1
-                precisions.append(cnt / (i + 1))
-        return sum(precisions) / len(t)
+                precisions += cnt / (i + 1)
+        return precisions / len(t)
     return np.mean([AP(t, p) for t, p in zip(truth, prediction)])
