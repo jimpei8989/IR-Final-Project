@@ -43,7 +43,7 @@ def main():
                 max_features =args.maxFeatures,
                 max_df=args.maxDF,
                 min_df=args.minDF,
-                sublinear_tf=args.sublinearTF
+                norm=None
             )
 
             tfidf = model.fit_transform(tqdm(corpus))
