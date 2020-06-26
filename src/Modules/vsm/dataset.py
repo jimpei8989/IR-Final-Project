@@ -1,7 +1,8 @@
 import os
 
 class Corpus:
-    def __init__(self, corpusDir, docIDFile):
+    def __init__(self, corpusDir, docIDFile, usedFeatures=['title', 'content']):
+        self.usedFeatures = usedFeatures
         with open(docIDFile) as f:
             self.documentIDs = [line.strip() for line in  f.readlines()]
             self.docID2idx = {docID : idx for idx, docID in enumerate(self.documentIDs)}
@@ -16,13 +17,18 @@ class Corpus:
 
     def __iter__(self):
         corpusFD = open(self.corpusFile)
+        features = []
+        if 'title' in self.usedFeatures: features.append(2)
+        if 'content' in self.usedFeatures: features.append(3)
+
         def getDocument(docID):
             corpusFD.seek(self.offsetLookup[docID])
-            try:    # Some documents might not be saved well
-                docID, url, title, content = corpusFD.readline().strip().split('\t')
-                return title + ' ' + content
-            except:
+            sections = corpusFD.readline().strip().split('\t')
+            if len(sections) == 4:
+                return ' '.join(s for i, s in enumerate(sections) if i in features)
+            else:
                 return ''
+                
 
         for docID in self.documentIDs:
             yield getDocument(docID)

@@ -15,7 +15,7 @@ def main():
     args = parseeArguments()
 
     # Get the corpus generator
-    corpus = Corpus(os.path.join(args.dataDir, 'corpus/'), args.docIDFile)
+    corpus = Corpus(os.path.join(args.dataDir, 'corpus/'), args.docIDFile, args.usedFeatures)
 
     if args.fit:
         with EventTimer('Fitting model'):
@@ -56,7 +56,7 @@ def main():
                     APs = list(tqdm(p.imap(evaluate, queries), total=len(queries)))
 
                 print(f'> MAP: {np.mean(APs):.4f}')
-                print(f'{qdir} -> MAP: {np.mean(APs):.4f}', file=f)
+                print(f'{qdir}\t-> MAP: {np.mean(APs):.4f}', file=f)
 
 def parseeArguments():
     parser = ArgumentParser()
@@ -65,6 +65,7 @@ def parseeArguments():
     parser.add_argument('--queryDir', nargs='+', default=['data/partial/train/'])
     parser.add_argument('--modelDir', default='models/vsm/')
     parser.add_argument('--fit', action='store_true')
+    parser.add_argument('--usedFeatures', nargs='+', default=['title', 'content'])
     parser.add_argument('--maxFeatures', type=int, default=10**5, help='Maximum features used')
     parser.add_argument('--minDF', type=int, default=100, help='Minimum appearance can a word be adopted')
     parser.add_argument('--maxDF', type=float, default=0.5, help='Maximum frequency can a word be adopted')
