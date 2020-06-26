@@ -45,9 +45,9 @@ if __name__ == "__main__":
             query_set = QueryDataset(query_dir)
 
             if args.stemming:
-                queries = PorterStemmer().stem_documents(query_set.queries[:100])
+                queries = PorterStemmer().stem_documents(query_set.queries[:1000])
             else:
                 queries = query_set.queries
             pred_idx = doc2vecc.get_similar(queries, 1000)
             pred_id = idx2id[pred_idx]
-            print(f'\033[32;1m{task} MAP Score: {utils.MAP(query_set.relevantDocuments[:100], pred_id)}\033[0m')
+            print(f'\033[32;1m{task} MAP Score: {utils.MAP(query_set.relevantDocuments, pred_id)}\033[0m')
