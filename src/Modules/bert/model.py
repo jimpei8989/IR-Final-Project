@@ -18,9 +18,8 @@ class BertModel(nn.Module):
         self.freezeBert()
         
     def forward(self, documentTokens, queryTokens):
-        documentEmbedding = self.bert(documentTokens)[0]
-        queryEmbedding = self.bert(queryTokens)[0]
-        print(documentEmbedding.shape, queryEmbedding.shape)
+        documentEmbedding = self.bert(documentTokens)[0][:, 0]
+        queryEmbedding = self.bert(queryTokens)[0][:, 0]
 
         return self.classifier(torch.cat([documentEmbedding, queryEmbedding], dim=1))
 
@@ -28,7 +27,7 @@ class BertModel(nn.Module):
         for param in self.bert.parameters():
             param.requires_grad = False
 
-    def unFreezeBert(self, last = 2):
+    def unfreezeBert(self, last = 2):
         for layer in list(self.bert.encoder.layer.childrens())[-last:]:
             for param in layer.parameters():
                 param.requires_grad = True
