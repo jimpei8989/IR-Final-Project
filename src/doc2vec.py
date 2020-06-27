@@ -5,25 +5,35 @@ import pandas as pd
 from tqdm import tqdm, trange
 from gensim.parsing.porter import PorterStemmer
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import normalize
+
 
 from Modules import utils
 from dataset import QueryDataset
 
-def get_similar(model, query, topk=100, batch_size=2500):
+def get_similar(model, query, topk=100, batch_size=2500, relevance_feedback_steps=2, alpha=0.8, relevance_doc_num=100):
     query_vec = np.array([model.infer_vector(q.split()) for q in query])
     print(query_vec.shape)
+
+    docvecs_norm = normalize(model.docvecs.vectors_docs)
     if isinstance(query, str):
-        sims = cosine_similarity(query_vec.reshape(1, -1), model.docvecs.vectors_docs)[0]
-        arg = np.argpartition(sims, -topk)[-topk:]
-        return arg[np.argsort(sims[arg])[::-1]]
+        for _ in range(relevance_feedback_steps):               
+            sims = (docvecs_norm @ query_vec.reshape(-1, 1)).ravel()
+            arg = np.argpartition(sims, -topk)[-topk:]
+            arg_sorted = arg[np.argsort(sims[arg])[::-1]]
+            query_vec = alpha * query_vec + (1 - alpha) * np.mean(self.docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
+        return arg_sorted
 
     print(f'query_vec: {query_vec.shape}')
     topk_idx = []
     for i in trange(0, len(query_vec), batch_size):
-        sims = cosine_similarity(query_vec[i:i + batch_size], model.docvecs.vectors_docs)
-        arg = np.argpartition(sims, -topk, axis=1)[:, -topk:]
-        topk_idx.append(np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:, ::-1], axis=1))
+        for _ in range(relevance_feedback_steps):               
+            sims = query_vec[i:i + batch_size] @ docvecss_norm.T
+            arg = np.argpartition(sims, -topk, axis=1)[:, -topk:]
+            arg_sorted = np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:,::-1], axis=1)
+            rel_vec = np.mean(self.docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
+            query_vec[i:i + batch_size] = alpha * query_vec[i:i + batch_size] + (1 - alpha) * rel_vec
+        topn_idx.append(arg_sorted)
 
     return np.concatenate(topk_idx, axis=0)
 
@@ -35,6 +45,10 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--query-dirs', nargs=3, help='training query dir, dev query dir, test query, dir')
     parser.add_argument('-vs', '--vector-size', type=int, default=100)
     parser.add_argument('-s', '--stemming', action='store_true')
+    parser.add_argument('-r', '--relevance-feedback-steps', type=int, default=2)
+    parser.add_argument('-a', '--alpha', type=float, default=0.8, help='Original ratio for relevance feedback.')
+    parser.add_argument('-rn', '--relevance-doc-num', type=int, default=100, help='Number of documents to be treat as relevant ones during relevance feedback.')
+
     args = parser.parse_args()
     
     assert not (bool(args.query_dirs) ^ bool(args.docid_pkl_file)), 'docid_pkl_file must exist if query_dirs exist.'
@@ -54,7 +68,7 @@ if __name__ == "__main__":
             if args.stemming:
                 queries = PorterStemmer().stem_documents(query_set.queries[:100])
             else:
-                queries = query_set.queries[:10000]
-            pred_idx = get_similar(doc2vec, queries, 1000)
+                queries = query_set.queries
+            pred_idx = get_similar(doc2vec, queries, 1000, relevance_feedback_steps=args.relevance_feedback_steps, alpha=args.alpha, relevance_doc_num=args.relevance_doc_num)
             pred_id = idx2id[pred_idx]
-            print(f'\033[32;1m{task} MAP Score: {utils.MAP(query_set.relevantDocuments[:10000], pred_id)}\033[0m')
+            print(f'\033[32;1m{task} MAP Score: {utils.MAP(query_set.relevantDocuments, pred_id)}\033[0m')
