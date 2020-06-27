@@ -56,15 +56,18 @@ def main():
     print(f'> TFIDF shape: {tfidf.shape}')
 
     tfidf = normalize(tfidf, axis=1)
+    alpha = 0.8
     # Query
     def evaluate(q):
         query, rel = q
         queryVec = model.transform([query]).toarray()
         queryVec *= (args.k3 + 1) / (args.k3 + queryVec)
-        queryVec = normalize(queryVec, axis=1)
-        scores = (tfidf @ queryVec.reshape(-1, 1)).reshape(-1)
-        topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
-        topKIdxes = sorted(topKIdxes, key=lambda i:scores[i], reverse=True)
+
+        for _ in range(2):
+            scores = (tfidf @ normalize(queryVec, axis=1).reshape(-1, 1)).ravel()
+            topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
+            topKIdxes = topKIdxes[np.argsort(scores[topKIdxes])[::-1]]
+            queryVec = alpha * queryVec + (1 - alpha) * np.sum(tfidf[topKIdxes[:min(args.topK, 100)]].toarray(), axis=0, keepdims=True)
         return utils.MAP([rel], [map(corpus.idx2DocID, topKIdxes)])
 
     with open(os.path.join(args.modelDir, 'result.txt'), 'w') as f:
