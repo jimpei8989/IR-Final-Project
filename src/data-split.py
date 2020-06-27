@@ -102,16 +102,14 @@ def main():
                 
     if args.generateCorpus:
         with EventTimer('Generating Corpus'):
-            offsetLookup = {}
             with open(os.path.join('data', 'corpus', 'msmarco-docs-lookup.tsv')) as f:
-                for QID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines()):
-                    offsetLookup[QID] = int(tsvOffset)
+                offsetLookup = {QID: int(tsvOffset) for QID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines())}
 
             with open(os.path.join('data', 'corpus', 'msmarco-docs.tsv')) as f:
                 def getDocument(docID):
                     f.seek(offsetLookup[docID])
                     docID, url, title, content = f.readline().split('\t')
-                    return title + content
+                    return title + ' ' + content
                 corpus = list(map(getDocument, tqdm(partialCorpusIDs)))
         
         with open('data/partial/corpus/partial_corpus.pkl', 'wb') as f:
