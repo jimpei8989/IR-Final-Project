@@ -56,18 +56,17 @@ def main():
     print(f'> TFIDF shape: {tfidf.shape}')
 
     tfidf = normalize(tfidf, axis=1)
-    alpha = 0.8
     # Query
     def evaluate(q):
         query, rel = q
         queryVec = model.transform([query]).toarray()
         queryVec *= (args.k3 + 1) / (args.k3 + queryVec)
 
-        for _ in range(2):
+        for _ in range(args.relevance_feedback_steps):
             scores = (tfidf @ normalize(queryVec, axis=1).reshape(-1, 1)).ravel()
             topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
             topKIdxes = topKIdxes[np.argsort(scores[topKIdxes])[::-1]]
-            queryVec = alpha * queryVec + (1 - alpha) * np.sum(tfidf[topKIdxes[:min(args.topK, 100)]].toarray(), axis=0, keepdims=True)
+            queryVec = args.alpha * queryVec + (1 - args.alpha) * np.sum(tfidf[topKIdxes[:args.relevance_doc_num]].toarray(), axis=0, keepdims=True)
         return utils.MAP([rel], [map(corpus.idx2DocID, topKIdxes)])
 
     with open(os.path.join(args.modelDir, 'result.txt'), 'w') as f:
@@ -93,6 +92,9 @@ def parseeArguments():
     parser.add_argument('--b', type=float, default=0.75)
     parser.add_argument('--topK', type=int, default=1000)
     parser.add_argument('--numWorkers', type=int, default=16)
+    parser.add_argument('-r', '--relevance-feedback-steps', type=int, default=2)
+    parser.add_argument('-a', '--alpha', type=float, default=0.8, help='Original ratio for relevance feedback.')
+    parser.add_argument('-rn', '--relevance-doc-num', type=int, default=100, help='Number of documents to be treat as relevant ones during relevance feedback.')
     return parser.parse_args()
 
 if __name__ == '__main__':
