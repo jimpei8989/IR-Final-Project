@@ -55,7 +55,7 @@ def main():
 
     print(f'> TFIDF shape: {tfidf.shape}')
 
-    tfidf = normalize(tfidf, axis=1)
+    tfidf_norm = normalize(tfidf, axis=1)
     # Query
     def evaluate(q):
         query, rel = q
@@ -63,10 +63,10 @@ def main():
         queryVec *= (args.k3 + 1) / (args.k3 + queryVec)
 
         for _ in range(args.relevance_feedback_steps):
-            scores = (tfidf @ normalize(queryVec, axis=1).reshape(-1, 1)).ravel()
+            scores = (tfidf_norm @ queryVec.reshape(-1, 1)).ravel()
             topKIdxes = np.argpartition(-scores, args.topK)[:args.topK]
             topKIdxes = topKIdxes[np.argsort(scores[topKIdxes])[::-1]]
-            queryVec = args.alpha * queryVec + (1 - args.alpha) * np.sum(tfidf[topKIdxes[:args.relevance_doc_num]].toarray(), axis=0, keepdims=True)
+            queryVec = args.alpha * queryVec + (1 - args.alpha) * np.mean(tfidf[topKIdxes[:args.relevance_doc_num]].toarray(), axis=0, keepdims=True)
         return utils.MAP([rel], [map(corpus.idx2DocID, topKIdxes)])
 
     with open(os.path.join(args.modelDir, 'result.txt'), 'w') as f:
