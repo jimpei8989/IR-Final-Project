@@ -282,7 +282,7 @@ class Doc2VecC(BaseEstimator):
                 sims = (self.docvecs_norm @ query_vec.reshape(-1, 1)).ravel()
                 arg = np.argpartition(sims, -topn)[-topn:]
                 arg_sorted = arg[np.argsort(sims[arg])[::-1]]
-                query_vec = alpha * query_vec + (1 - alpha) * np.sum(self.docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
+                query_vec = alpha * query_vec + (1 - alpha) * np.mean(self.docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
             return arg_sorted
 
         print(f'query_vec: {query_vec.shape}')
@@ -292,7 +292,7 @@ class Doc2VecC(BaseEstimator):
                 sims = query_vec[i:i + batch_size] @ self.docvecs_norm.T
                 arg = np.argpartition(sims, -topn, axis=1)[:, -topn:]
                 arg_sorted = np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:,::-1], axis=1)
-                rel_vec = np.sum(self.docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
+                rel_vec = np.mean(self.docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
                 query_vec[i:i + batch_size] = alpha * query_vec[i:i + batch_size] + (1 - alpha) * rel_vec
             topn_idx.append(arg_sorted)
 
