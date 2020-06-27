@@ -13,7 +13,7 @@ _Reset = '\x1b[0m'
 SEED = 0x06902001 ^ 0x06902029 ^ 0x06902039 ^ 0x06902103
 
 class EventTimer():
-    def __init__(self, name = '', verbose = True):
+    def __init__(self, name='', verbose=True):
         self.name = name
         self.verbose = verbose
 
@@ -30,6 +30,7 @@ class EventTimer():
 
     def gettime(self):
         return time.time() - self.beginTimestamp
+
 
 def jsonSave(obj, file):
     with open(file, 'w') as f:
