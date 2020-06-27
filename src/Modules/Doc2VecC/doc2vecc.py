@@ -7,6 +7,7 @@ from tqdm import tqdm, trange
 import \
     c_doc2vecc  # custom module created from Minmin Chen's implementation of DocvecC https://github.com/mchen24/iclr2017
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import normalize
 import pickle
 from Modules.utils import EventTimer
 
@@ -272,21 +273,28 @@ class Doc2VecC(BaseEstimator):
         for filename in (self.train_file, self.wordvec_file, self.docvec_file):
             if os.path.exists(filename): os.remove(filename)
 
-    def get_similar(self, query, topn=100, batch_size=2500):
+    def get_similar(self, query, topn=100, batch_size=2500, relevance_feedback_steps=2, alpha=0.8, relevance_doc_num=100):
         query_vec = self.infer_vector(query)
         if not hasattr(self, 'docvecs_norm'):
-            self.docvecs_norm = self.docvecs / (np.linalg.norm(self.docvecs, axis=1, keepdims=True) + 1e-8)
+            self.docvecs_norm = normalize(self.docvecs)
         if isinstance(query, str):
-            sims = (self.docvecs_norm @ query_vec.reshape(-1, 1)).ravel()
-            arg = np.argpartition(sims, -topn)[-topn:]
-            return arg[np.argsort(sims[arg])[::-1]]
+            for _ in range(relevance_feedback_steps):               
+                sims = (self.docvecs_norm @ query_vec.reshape(-1, 1)).ravel()
+                arg = np.argpartition(sims, -topn)[-topn:]
+                arg_sorted = arg[np.argsort(sims[arg])[::-1]]
+                query_vec = alpha * query_vec + (1 - alpha) * np.sum(self.docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
+            return arg_sorted
 
         print(f'query_vec: {query_vec.shape}')
         topn_idx = []
         for i in trange(0, len(query_vec), batch_size):
-            sims = query_vec[i:i + batch_size] @ self.docvecs_norm.T
-            arg = np.argpartition(sims, -topn, axis=1)[:, -topn:]
-            topn_idx.append(np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:, ::-1], axis=1))
+            for _ in range(relevance_feedback_steps):               
+                sims = query_vec[i:i + batch_size] @ self.docvecs_norm.T
+                arg = np.argpartition(sims, -topn, axis=1)[:, -topn:]
+                arg_sorted = np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:,::-1], axis=1)
+                rel_vec = np.sum(self.docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
+                query_vec[i:i + batch_size] = alpha * query_vec[i:i + batch_size] + (1 - alpha) * rel_vec
+            topn_idx.append(arg_sorted)
 
         return np.concatenate(topn_idx, axis=0)
             

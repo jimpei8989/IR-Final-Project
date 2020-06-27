@@ -7,7 +7,7 @@ from gensim.parsing.porter import PorterStemmer
 from joblib import Parallel, delayed
 
 from Modules import utils
-from Modules.Doc2VecC_python.doc2vecc import Doc2VecC
+from Modules.Doc2VecC.doc2vecc import Doc2VecC
 from dataset import QueryDataset
 
 if __name__ == "__main__":
