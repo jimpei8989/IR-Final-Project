@@ -14,7 +14,7 @@ class BertModel(nn.Module):
             nn.Linear(clfHiddenDim, 1),
             nn.Sigmoid()
         )
-
+        
         self.freezeBert()
         
     def forward(self, documentTokens, queryTokens):
@@ -28,7 +28,7 @@ class BertModel(nn.Module):
             param.requires_grad = False
 
     def unfreezeBert(self, last = 2):
-        for layer in list(self.bert.encoder.layer.childrens())[-last:]:
+        for layer in list(self.bert.encoder.layer.children())[-last:]:
             for param in layer.parameters():
                 param.requires_grad = True
 
