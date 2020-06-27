@@ -65,7 +65,7 @@ def main():
                 
                 
                 if validationInterval is not None and (i + 1) % validationInterval == 0:
-                    print('Epoch: {epoch:2d} Valid')
+                    print('\n', end='\r')
                     val_loss, val_acc = runEpoch(epoch, valid_dataloader, train=False)
                     print(f'> Epoch: {epoch:2d} | loss: {losses[-1]:.05f}, acc: {accuracies[-1]:.03f} | val_loss: {val_loss:.05f}, val_acc: {val_acc:.03f}', end='\n')
 
