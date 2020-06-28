@@ -17,11 +17,15 @@ class BertModel(nn.Module):
         
         self.freezeBert()
         
-    def forward(self, documentTokens, queryTokens):
-        documentEmbedding = self.bert(documentTokens)[0][:, 0]
-        queryEmbedding = self.bert(queryTokens)[0][:, 0]
-
-        return self.classifier(torch.cat([documentEmbedding, queryEmbedding], dim=1))
+    def forward(self, documentTokens, queryTokens, mode=0):
+        if mode == 0:
+            documentEmbedding = self.bert(documentTokens)[0][:, 0]
+            queryEmbedding = self.bert(queryTokens)[0][:, 0]
+            return self.classifier(torch.cat([documentEmbedding, queryEmbedding], dim=1))
+        elif mode == 1:
+            return self.bert(documentTokens)[0][:,0]
+        elif mode == 2:
+            return self.classifier(torch.cat([documentEmbedding, queryEmbedding], dim=1))
 
     def freezeBert(self):
         for param in self.bert.parameters():

@@ -81,3 +81,65 @@ class RetrievalDataset(Dataset):
 
     def __len__(self):
         return self.epochStepSize
+
+
+class DocRetrievalDataset(Dataset):
+    def __init__(self, corpusDir, docIDFile, queryDir):
+        super().__init__()
+
+        # Build Corpus
+        with open(docIDFile) as f:
+            self.documentIDs = [line.strip() for line in  f.readlines()]
+            self.docID2idx = {docID : idx for idx, docID in enumerate(self.documentIDs)}
+
+        self.offsetLookup = {}
+        with open(os.path.join(corpusDir, 'msmarco-docs-lookup.tsv')) as f:
+            for docID, trecOffset, tsvOffset in map(lambda line : line.strip().split(), f.readlines()):
+                self.offsetLookup[docID] = int(tsvOffset)
+
+        # Get the corresponding document path
+        self.corpusFD = open(os.path.join(corpusDir, 'msmarco-docs.tsv'))
+
+        self.epochStepSize = 1000000
+
+
+    def __del__(self):
+        self.corpusFD.close()
+
+    def __getitem__(self, idx):
+        def getDocument(docID):
+            self.corpusFD.seek(self.offsetLookup[docID])
+            sections = self.corpusFD.readline().strip().split('\t')
+            if len(sections) == 4:
+                return ' '.join(sections[2:]).lower()
+            else:
+                return ''
+
+        return getDocument(self.documentIDs[idx])
+
+    def __len__(self):
+        return self.epochStepSize
+
+
+class QueryRetrievalDataset(Dataset):
+    def __init__(self, corpusDir, docIDFile, queryDir):
+        super().__init__()
+        # Get the corresponding document path
+        self.corpusFD = open(os.path.join(corpusDir, 'msmarco-docs.tsv'))
+
+        # Build query
+        with open(os.path.join(queryDir, 'queries.tsv')) as f:
+            self.queryIDs, self.queries = zip(*map(lambda line : line.strip().split('\t'), f.readlines()))
+
+        self.epochStepSize = len(self.queries)
+
+
+    def __del__(self):
+        self.corpusFD.close()
+
+    def __getitem__(self, idx):
+        return self.queries[idx]
+
+    def __len__(self):
+        return self.epochStepSize
+

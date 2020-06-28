@@ -13,7 +13,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 from Modules import utils
 from Modules.utils import EventTimer
-from Modules.bert.dataset import RetrievalDataset
+from Modules.bert.dataset import RetrievalDataset, DocRetrievalDataset, QueryRetrievalDataset
 from Modules.bert.model import BertModel
 
 def scheduler(model, epoch):
@@ -34,13 +34,19 @@ def main():
         validDataset = RetrievalDataset(corpusDir, args.docIDFile, args.validDir)
         validDataloader = DataLoader(validDataset, batch_size=args.batchSize, num_workers=1)
 
+        docDataset = DocRetrievalDataset(corpusDir, args.docIDFile, args.testDir)
+        docDataloader = DataLoader(docDataset, batch_size=args.batchSize, num_workers=1)
+
+        queryDataset = QueryRetrievalDataset(corpusDir, args.docIDFile, args.testDir)
+        queryDataloader = DataLoader(queryDataset, batch_size=args.batchSize, num_workers=1)
+
     with EventTimer('Build model'):
         bert = torch.hub.load('huggingface/pytorch-transformers', 'model', 'bert-base-uncased')
         tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'bert-base-uncased')
 
         model = BertModel(bert, args.clfHiddenDim).to(device)
         optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
-        lr_scheduler = ReduceLROnPlateau(optimizer, factor=0.3, patience=4, verbose=True, min_lr=1e-6) 
+        lr_scheduler = ReduceLROnPlateau(optimizer, factor=0.3, patience=4, verbose=True, min_lr=1e-6)
         criterion = BCELoss()
 
     with EventTimer('Train Model'):
@@ -71,21 +77,64 @@ def main():
 
             return np.mean(losses), np.mean(accuracies)
 
-        for epoch in range(1, args.epochs + 1):
-            scheduler(model, epoch)
-            trainDataloader = DataLoader(trainDataset, batch_size=8+4*epoch, num_workers=1)
-            validDataloader = DataLoader(validDataset, batch_size=args.batchSize, num_workers=1)
-            trainLoss, trainAccu = runEpoch(epoch, trainDataloader, validDataloader, args.validationInterval)
-            validLoss, validAccu = runEpoch(epoch, validDataloader, train=False)
-            lr_scheduler.step(validLoss)
+        def runPredict(docloader, queryloader):
+            model.eval()
+            docEmb = []
+            queryEmb = []
+            allMAP = []
+            with torch.no_grad():
+                for i, doc in enumerate(tqdm(docloader)):
+                    docTokens = pad_sequence([torch.LongTensor(tokenizer.encode(d)[:512]) for d in doc], batch_first=True).to(device)
+                    docEmb.append(model(docTokens, None, 1).cpu())
+                docEmb = torch.cat(docEmb, dim=0)
+                for i, query in enumerate(tqdm(queryloader)):
+                    queryTokens = pad_sequence([torch.LongTensor(tokenizer.encode(d)[:512]) for q in query], batch_first=True).to(device)
+                    queryEmb.append(model(queryTokens, None, 1).cpu())
+                queryEmb = torch.cat(queryEmb, dim=0)
+                
+                with open(args.docIDFile) as F:
+                    docIDs = [line.strip() for line in F.readlines()]
+                for i in tqdm(range(1000)):#tqdm(range(len(queryEmb))):
+                    score = []
+                    while True:
+                        idx = 0
+                        output = model(torch.stack([queryEmb[i]]*args.batchSize).to(device), docEmb[idx:idx+args.batchSize if idx+args.batchSize <= 1000000 else None].to(device), 2)
+                        score.append(output)
+                        idx += args.batchSize
+                        if idx >= 1000000:    break
+                    score = torch.cat(score, dim=0)
+                    pred = torch.topk(score.squeeze(),args.topK)[1]
+                    predDoc = [docIDs[doc.item()] for doc in pred]
+                    with open(os.path.join(args.testDir, 'topK.csv')) as F:    truth = [set(line.strip().split(',')[1].split()) for line in F.readlines()]
+                    allMAP.append(utils.MAP(truth, predDoc))
+                    print(f'Query {(i+1):3d} -- MAP: {allMAP[-1]:.4f}')
 
-            checkpoint = {}
-            checkpoint['model'] = model.state_dict()
-            checkpoint['optim'] = optimizer.state_dict()
-            checkpoint['val_acc'] = validAccu
-            torch.save(checkpoint, os.path.join(args.modelDir, f'{epoch}'))
+            return np.mean(allMAP)
 
-            print(f'> Epoch: {epoch:2d} | loss: {trainLoss:.05f}, acc: {trainAccu:.03f} | val_loss: {validLoss:.05f}, val_acc: {validAccu:.03f}')
+
+        if args.predict:
+            checkpoint = torch.load(args.predict)
+            model.load_state_dict(checkpoint['model'])
+            validAccu = checkpoint['val_acc']
+            aveMAP = runPredict(docDataloader, queryDataloader)
+            print(f'Valid Accuracy: {validAccu:.03f} | Average MAP: {aveMAP:.05f}')
+        else:
+            for epoch in range(1, args.epochs + 1):
+                scheduler(model, epoch)
+                trainDataloader = DataLoader(trainDataset, batch_size=8+4*epoch, num_workers=1)
+                validDataloader = DataLoader(validDataset, batch_size=args.batchSize, num_workers=1)
+                trainLoss, trainAccu = runEpoch(epoch, trainDataloader, validDataloader, args.validationInterval)
+                validLoss, validAccu = runEpoch(epoch, validDataloader, train=False)
+                lr_scheduler.step(validLoss)
+
+                checkpoint = {}
+                checkpoint['model'] = model.state_dict()
+                checkpoint['optim'] = optimizer.state_dict()
+                checkpoint['val_acc'] = validAccu
+                torch.save(checkpoint, os.path.join(args.modelDir, f'{epoch}'))
+
+                print(f'> Epoch: {epoch:2d} | loss: {trainLoss:.05f}, acc: {trainAccu:.03f} | val_loss: {validLoss:.05f}, val_acc: {validAccu:.03f}')
+    
 
 def parseArguments():
     parser = ArgumentParser()
@@ -93,6 +142,7 @@ def parseArguments():
     parser.add_argument('-di', '--docIDFile', default='data/partial/corpus/docIDs')
     parser.add_argument('-t', '--trainDir', default='data/partial/train')
     parser.add_argument('-v', '--validDir', default='data/partial/dev')
+    parser.add_argument('-te', '--testDir', default='data/partial/test')
     parser.add_argument('-m', '--modelDir', default='models/bert/')
     parser.add_argument('-hd', '--clfHiddenDim', type=int, default=2048)
     parser.add_argument('--lr', type=float, default=1e-4)
@@ -103,6 +153,7 @@ def parseArguments():
     parser.add_argument('--topK', type=int, default=1000)
     # parser.add_argument('-n', '--numWorkers', type=int, default=8)
     parser.add_argument('-g', '--gpuID', default='0')
+    parser.add_argument('-p', '--predict', type=str, default='')
     return parser.parse_args()
 
 if __name__ == '__main__':
