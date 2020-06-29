@@ -2,6 +2,7 @@ import os
 from argparse import ArgumentParser
 import logging
 from tqdm import tqdm
+import pickle
 
 import numpy as np
 import torch
@@ -87,11 +88,15 @@ def main():
                     docTokens = pad_sequence([torch.LongTensor(tokenizer.encode(d)[:512]) for d in doc], batch_first=True).to(device)
                     docEmb.append(model(docTokens, None, 1).cpu())
                 docEmb = torch.cat(docEmb, dim=0)
+                with open('docEmb.pkl','wb') as F:
+                    pickle.dump(docEmb, F)
                 for i, query in enumerate(tqdm(queryloader)):
-                    queryTokens = pad_sequence([torch.LongTensor(tokenizer.encode(d)[:512]) for q in query], batch_first=True).to(device)
+                    queryTokens = pad_sequence([torch.LongTensor(tokenizer.encode(q)[:512]) for q in query], batch_first=True).to(device)
                     queryEmb.append(model(queryTokens, None, 1).cpu())
                 queryEmb = torch.cat(queryEmb, dim=0)
-                
+                with open('queryEmb.pkl','wb') as F:
+                    pickle.dump(queryEmb, F)
+
                 with open(args.docIDFile) as F:
                     docIDs = [line.strip() for line in F.readlines()]
                 for i in tqdm(range(1000)):#tqdm(range(len(queryEmb))):
@@ -106,7 +111,7 @@ def main():
                     pred = torch.topk(score.squeeze(),args.topK)[1]
                     predDoc = [docIDs[doc.item()] for doc in pred]
                     with open(os.path.join(args.testDir, 'topK.csv')) as F:    truth = [set(line.strip().split(',')[1].split()) for line in F.readlines()]
-                    allMAP.append(utils.MAP(truth, predDoc))
+                    allMAP.append(utils.MAP([truth], [predDoc]))
                     print(f'Query {(i+1):3d} -- MAP: {allMAP[-1]:.4f}')
 
             return np.mean(allMAP)
