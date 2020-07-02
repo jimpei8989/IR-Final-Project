@@ -42,13 +42,19 @@ class Corpus:
         return self.documentIDs[idx]
 
 class QueryDataset:
-    def __init__(self, queryDir):
+    def __init__(self, queryDir, num=None):
         with open(os.path.join(queryDir, 'queries.tsv')) as f:
             self.queryIDs, self.queries = zip(*map(lambda line : line.strip().split('\t'), f.readlines()))
+        
             self.ID2idx = {q : i for i, q in enumerate(self.queryIDs)}
 
         with open(os.path.join(queryDir, 'topK.csv')) as f:
             self.relevantDocuments = [line.strip().split(',')[1].split(' ') for line in f.readlines()]
+
+        if num is not None:
+            self.queryIDs = self.queryIDs[:num]
+            self.queries = self.queries[:num]
+            self.relevantDocuments = self.relevantDocuments[:num]    
 
     def __iter__(self):
         for query, rel in zip(self.queries, self.relevantDocuments):
