@@ -21,19 +21,19 @@ def get_similar(model, query, topk=100, batch_size=2500, relevance_feedback_step
             sims = (docvecs_norm @ query_vec.reshape(-1, 1)).ravel()
             arg = np.argpartition(sims, -topk)[-topk:]
             arg_sorted = arg[np.argsort(sims[arg])[::-1]]
-            query_vec = alpha * query_vec + (1 - alpha) * np.mean(self.docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
+            query_vec = alpha * query_vec + (1 - alpha) * np.mean(docvecs_norm[arg_sorted[:relevance_doc_num]], axis=0)
         return arg_sorted
 
     print(f'query_vec: {query_vec.shape}')
     topk_idx = []
     for i in trange(0, len(query_vec), batch_size):
         for _ in range(relevance_feedback_steps):               
-            sims = query_vec[i:i + batch_size] @ docvecss_norm.T
+            sims = query_vec[i:i + batch_size] @ docvecs_norm.T
             arg = np.argpartition(sims, -topk, axis=1)[:, -topk:]
             arg_sorted = np.take_along_axis(arg, np.argsort(np.take_along_axis(sims, arg, axis=1), axis=1)[:,::-1], axis=1)
-            rel_vec = np.mean(self.docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
+            rel_vec = np.mean(docvecs_norm[arg_sorted[:,:relevance_doc_num]], axis=1)
             query_vec[i:i + batch_size] = alpha * query_vec[i:i + batch_size] + (1 - alpha) * rel_vec
-        topn_idx.append(arg_sorted)
+        topk_idx.append(arg_sorted)
 
     return np.concatenate(topk_idx, axis=0)
 
